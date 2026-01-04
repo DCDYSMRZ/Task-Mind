@@ -1,0 +1,21 @@
+# task-mind Pack Manifest
+# Whitelist for PyPI distribution
+# Source: ~/.claude/commands/, ~/.claude/skills/, ~/.task-mind/recipes/
+
+commands:
+  - task-mind.run.md
+  - task-mind.do.md
+  - task-mind.recipe.md
+  - task-mind.skill.md
+  - task-mind.test.md
+  - task-mind/*
+
+skills:
+  - task-mind-x-extract-tweet-with-comments
+  - task-mind-view-content-generate-tips-*
+
+recipes:
+  - atomic/system/clipboard_read
+  - atomic/system/file_copy
+  - atomic/system/cdp_list_tabs_and_select_target
+  - atomic/chrome/x_extract_tweet_with_comments

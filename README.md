@@ -1,0 +1,416 @@
+# Task-Mind - Multi-Runtime Automation Infrastructure
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/DCDYSMRZ/Task-Mind)
+[![Chrome](https://img.shields.io/badge/requires-Chrome-green)](https://www.google.com/chrome/)
+[![Claude Code](https://img.shields.io/badge/powered%20by-Claude%20Code-purple)](https://claude.ai/code)
+
+[简体中文](https://github.com/DCDYSMRZ/Task-Mind/blob/main/README.zh-CN.md)
+
+**Docs**: [Key Concepts](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/concepts.md) · [Installation](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/installation.md) · [User Guide](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/user-guide.md) · [Recipes](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/recipes.md) · [Architecture](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/architecture.md) · [Use Cases](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/use-cases.md) · [Development](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/development.md)
+
+### Quick Start
+
+```bash
+uv tool install task-mind-cli   # Install Task-Mind
+task-mind init                   # Initialize environment
+task-mind server start           # Start web service
+# Open http://127.0.0.1:8093 in your browser
+```
+
+> New to `uv` or setting up a fresh system? See the [Installation Guide](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/installation.md) for prerequisites.
+
+---
+
+## Manifesto
+
+> AI should free people from repetitive labor, not become a new instrument of extraction.
+
+**Three beliefs that guide Task-Mind:**
+
+### 1. Delivery over Dialogue
+
+Chatting with AI produces nothing. The ICQ era of AI — endless conversation, zero delivery — wastes your time and money.
+
+Task-Mind exists for *results*: recipes that run, scripts that execute, data that's extracted. If AI can't hand you a deliverable, it hasn't done its job.
+
+### 2. Your Tools, Your Control
+
+We reject the narrative that you must wait for some company to build AGI before automation serves you.
+
+Task-Mind is open source. Your recipes, your skills, your Git repo. You accumulate capability, not subscription fees. The tools you build are *yours* — portable, version-controlled, independent.
+
+### 3. Against Token Exploitation
+
+Many "AI products" are token vending machines wrapped in pretty UIs. You pay per conversation, per generation, per retry — and get nothing persistent in return.
+
+Task-Mind attacks this directly:
+- First exploration: ~150k tokens
+- Every run after: ~2k tokens (98.7% saved)
+
+The savings compound. The recipes stay. Your time returns to family, hobbies, creation — not to feeding another revenue stream.
+
+---
+
+### Recent Updates
+
+| Version | Highlights |
+|---------|------------|
+| **v0.26.0** | Workspace file browser; `task-mind view` media support (video, image, audio, 3D models) |
+| **v0.24.0** | Community recipes infrastructure; `recipe install/uninstall/update/search/share` commands |
+| **v0.23.0** | WebSocket real-time sync; YouTube recipes (download, subtitles, transcript) |
+| **v0.22.0** | Cross-platform autostart; `task-mind autostart` command; integrated into init workflow |
+| **v0.21.0** | i18n support; user language preference for AI title generation |
+
+Multi-runtime automation infrastructure designed for AI agents, providing persistent context management and reusable Recipe system.
+
+---
+
+## Why Task-Mind
+
+When facing prompts, AI can only "talk" but not "do"—it "talks once" but never "follows through from start to finish." Think of ChatGPT in 2023. So people designed Agents. Agents call tools through standardized interfaces.
+
+But reality is: tasks are infinite, while tools are finite.
+
+You ask AI to extract YouTube subtitles. It spends 5 minutes exploring, succeeds. The next day, same request—it starts from scratch again. It completely forgot what it did yesterday.
+
+Even an Agent like Claude Code appears clumsy when facing each person's unique task requirements: every time it must explore, every time it burns through tokens, dragging the LLM from start to finish. Slow and unstable: out of 10 attempts, maybe 5 take the right path, while the other 5 are filled with "strange" and "painful" trial-and-error.
+
+Agents lack context—that's a fact. But what kind of context do they lack?
+
+People tried RAG, fragmenting information so Agents could retrieve and "find methods." This is "theoretically correct but practically misguided"—a massive pitfall. The key issue: each person's task requirements are "local" and bounded. They don't need a heavyweight RAG system. RAG over-complicates how individuals solve problems.
+
+Research from Anthropic and Google both point to: directly consulting documentation. The author of this project proposed the same view in 2024. But this approach requires Agents with sufficient capability. Claude Code is exactly such an Agent.
+
+Claude Code designed a documentation architecture: commands and skills, to practice this philosophy. Task-Mind builds on this foundation, deeply implementing the author's design philosophy: every piece of methodological knowledge must be tied to concrete executable tools.
+
+In Task-Mind's framework, skills are collections of methodologies, and recipes are collections of executable tools.
+
+The author's vision: through Task-Mind's Claude Code slash commands (/task-mind.run and other core commands), establish an Agent specification—enabling it to explore unfamiliar problems and standardize results into structured information; through self-awareness, proactively build the association between skills and recipes.
+
+Ultimately, your Agent can fully understand your descriptions of work and task requirements, leverage existing skills to find and properly use relevant recipes, achieving "driving automated execution with minimal token cost."
+
+Task-Mind is not the Agent itself, but the Agent's "skeleton."
+
+Agents are smart enough, but not yet resourceful. Task-Mind teaches them to remember how to get things done.
+
+---
+
+## How to Use
+
+Task-Mind integrates with Claude Code through four slash commands, forming a complete "explore → solidify → execute" loop.
+
+```
+/task-mind.run     Explore and research, accumulate experience
+     ↓
+/task-mind.recipe  Solidify experience into reusable recipes
+/task-mind.test    Validate recipes (while context is fresh)
+     ↓
+/task-mind.exec    Execute quickly with skill guidance
+```
+
+### Step 1: Explore and Research
+
+In Claude Code, type:
+
+```
+/task-mind.run Research how to extract YouTube video subtitles
+```
+
+The Agent will:
+- Create a project to store this run instance
+- Use Task-Mind's basic tools (navigate, click, exec-js, etc.) to explore
+- Automatically record `execution.jsonl` and key findings
+- Persist all screenshots, scripts, and output files
+
+```
+projects/youtube-transcript-research/
+├── logs/execution.jsonl    # Structured execution logs
+├── screenshots/            # Screenshot archive
+├── scripts/                # Validated scripts
+└── outputs/                # Output files
+```
+
+### Step 2: Solidify Recipes
+
+After exploration, type:
+
+```
+/task-mind.recipe
+```
+
+The Agent will:
+- Analyze the experience accumulated during exploration
+- Auto-generate necessary recipes for this task
+- Create corresponding skills (*coming soon*)
+- Associate skills with recipes
+
+Generated recipe example:
+
+```yaml
+---
+name: youtube_extract_video_transcript
+type: atomic
+runtime: chrome-js
+description: "Extract complete transcript text from YouTube videos"
+use_cases:
+  - "Batch extract video subtitle content for text analysis"
+  - "Create indexes or summaries for videos"
+---
+```
+
+### Step 3: Validate Recipes
+
+While the session context is still fresh, test immediately:
+
+```
+/task-mind.test youtube_extract_video_transcript
+```
+
+Validation failed? Fix it on the spot, no need to re-explore. This is why recipe and test should be parallel—debugging costs more after context is lost.
+
+### Step 4: Quick Execution
+
+Next time you have a similar need, type:
+
+```
+/task-mind.exec video-production Create a short video about AI
+```
+
+The Agent will:
+- Load the specified skill (video-production)
+- Follow the methodology in the skill to invoke relevant recipes
+- Complete the task quickly, no repeated exploration
+
+**This is the value of the "skeleton"**: 5 minutes to explore the first time, seconds to execute thereafter.
+
+---
+
+## Technical Foundation
+
+The above workflow relies on Task-Mind's underlying capabilities:
+
+| Capability | Description |
+|------------|-------------|
+| **Native CDP** | Direct Chrome DevTools Protocol connection, ~2MB lightweight, no Node.js deps |
+| **Run System** | Persistent task context, JSONL structured logs |
+| **Recipe System** | Metadata-driven, three-tier priority (Project > User > Example) |
+| **Web Service** | FastAPI backend + React frontend, browser-based GUI on port 8093 |
+| **Multi-Runtime** | Chrome JS, Python, Shell runtime support |
+
+```
+Architecture Comparison:
+Playwright:  Python → Node.js relay → CDP → Chrome  (~100MB)
+Task-Mind:   Python → CDP → Chrome                  (~2MB)
+```
+
+---
+
+## Task-Mind Is Not Playwright/Selenium
+
+Playwright and Selenium are **testing tools**—launch browser, run tests, close browser. Every run starts fresh.
+
+Task-Mind is **the skeleton for AI**—connect to an existing browser, explore, learn, remember. Experience accumulates.
+
+| You need... | Choose |
+|-------------|--------|
+| Quality assurance, regression testing, CI/CD | Playwright/Selenium |
+| Data collection, workflow automation, AI-assisted tasks | Task-Mind |
+| One-off scripts, run and discard | Playwright/Selenium |
+| Accumulate experience, faster next time | Task-Mind |
+
+Technical differences (lightweight, direct CDP, no Node.js dependency) are outcomes, not goals.
+
+**The core difference is design philosophy**: testing tools assume you know what to do; Task-Mind assumes you're exploring, and helps you remember what you discovered.
+
+## Task-Mind vs Dify/Coze/n8n
+
+Dify, Coze, and n8n are **workflow orchestration tools**.
+
+Traditional usage: manually drag nodes, connect lines, configure parameters. n8n launched [AI Workflow Builder](https://docs.n8n.io/advanced-ai/ai-workflow-builder/) that can generate workflow nodes from natural language (Dify and Coze don't have similar features yet).
+
+But whether manual or AI-assisted, what do you end up with? **A flowchart.**
+
+Then what?
+
+1. You still need to enter the platform, understand the diagram
+2. Run, error, go back and modify node config
+3. Run again, another error, modify again
+4. After debugging passes, the flowchart runs
+
+**AI drew the diagram for you, but debugging, modifying, maintaining—still your job.**
+
+Using Task-Mind:
+
+```
+/task-mind.run Scrape data from this website
+```
+
+No flowchart. AI goes to work directly—opens browser, clicks, extracts data, handles errors. You just wait.
+
+When done:
+
+```
+/task-mind.recipe
+```
+
+Recipe auto-generated. Next time:
+
+```
+/task-mind.exec Scrape similar website
+```
+
+**You don't need to enter any platform, don't need to look at any flowchart.**
+
+| | Orchestration Tools (incl. AI-assisted) | Task-Mind |
+|--|----------------------------------------|-------|
+| What AI does | Draws flowcharts for you | Does the work directly |
+| What you do | Enter platform, read diagrams, debug, modify config | State needs, wait for results |
+| Output | A flowchart that needs maintenance | Reusable recipe |
+
+**Orchestration tools' AI is your "diagram assistant"; Task-Mind's AI is your "executor".**
+
+Of course, if you need scheduled triggers, visual monitoring, team collaboration approvals—orchestration tools are better fits. But if you just want to get things done—Task-Mind lets you solve problems by talking, no platform to learn.
+
+---
+
+## Resource Management
+
+### Why Resource Sync Commands
+
+Task-Mind is open-source—anyone can install it via PyPI. But the **skeleton** is universal, while the **brain** is personal.
+
+Each person has:
+- Their own application scenarios
+- Personalized knowledge (skills)
+- Custom automation scripts (recipes)
+
+These personalized resources shouldn't live in the public package. They belong to you.
+
+Task-Mind's philosophy: **cross-environment consistency**. Your resources should be available wherever you work—different machines, fresh installations, or new projects. The tool comes from PyPI; your brain comes from your private repository.
+
+Task-Mind doesn't provide community-level cloud sync services (yet). Instead, it gives you commands to manage sync with your own Git repository.
+
+### Resource Flow Overview
+
+```
+┌─────────────┐   publish   ┌─────────────┐    sync    ┌─────────────┐
+│   Project   │ ──────────→ │   System    │ ─────────→ │   Remote    │
+│  .claude/   │             │ ~/.claude/  │            │  Git Repo   │
+│  examples/  │             │ ~/.task-mind/   │            │             │
+└─────────────┘             └─────────────┘            └─────────────┘
+       ↑                          │                          │
+       │       dev-load           │         deploy           │
+       └──────────────────────────┴──────────────────────────┘
+```
+
+### Commands
+
+| Command | Direction | Purpose |
+|---------|-----------|---------|
+| `publish` | Project → System | Push project resources to system directories |
+| `sync` | System → Remote | Push system resources to your private Git repo |
+| `deploy` | Remote → System | Pull from your private repo to system directories |
+| `dev-load` | System → Project | Load system resources into current project (dev only) |
+
+### Typical Workflows
+
+**Developer Flow** (local changes → cloud):
+```bash
+# After editing recipes in your project
+task-mind publish              # Project → System
+task-mind sync                 # System → Remote Git
+```
+
+**New Machine Flow** (cloud → local):
+```bash
+# First time setup on a new machine
+task-mind sync --set-repo git@github.com:you/my-task-mind-resources.git
+task-mind deploy               # Remote Git → System
+task-mind dev-load             # System → Project (if developing Task-Mind)
+```
+
+**Regular User** (just uses Task-Mind):
+```bash
+task-mind deploy               # Get latest resources from your repo
+# Resources are now in ~/.claude/ and ~/.task-mind/, ready to use
+```
+
+### What Gets Synced
+
+Only Task-Mind-specific resources are synced:
+- `task-mind.*.md` commands (not your other Claude commands)
+- `task-mind-*` skills (not your other skills)
+- All recipes in `~/.task-mind/recipes/`
+
+Your personal, non-Task-Mind Claude commands and skills are never touched.
+
+---
+
+## Documentation Navigation
+
+- **[Key Concepts](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/concepts.md)** - Skill, Recipe, Run definitions and relationships
+- **[Use Cases](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/use-cases.md)** - Complete workflow from Recipe creation to Workflow orchestration
+- **[Architecture](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/architecture.md)** - Core differences, technology choices, system design
+- **[Installation](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/installation.md)** - Installation methods, dependencies, optional features
+- **[User Guide](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/user-guide.md)** - CDP commands, Recipe management, Run system
+- **[Recipe System](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/recipes.md)** - AI-First design, metadata-driven, Workflow orchestration
+- **[Development](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/development.md)** - Project structure, development standards, testing methods
+- **[Roadmap](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/roadmap.md)** - Completed features, todos, version planning
+
+### Writings
+
+Personal thoughts on AI automation, Agent design, and lessons learned.
+
+→ **[Read the Writings](writings/README.md)**
+
+---
+
+## Project Status
+
+📍 **Current Stage**: Full-featured workspace with media preview support
+
+**Latest Features (v0.17.0 - v0.26.0)**:
+
+- ✅ Workspace file browser - Browse run instance directories in Web UI
+- ✅ Media viewer - `task-mind view` supports video, image, audio, 3D models (glTF/GLB)
+- ✅ Community recipes - `recipe install/uninstall/update/search/share` for community contributions
+- ✅ WebSocket real-time sync - Server push updates, reduced polling
+- ✅ YouTube recipes - Download videos, extract subtitles and transcripts
+- ✅ Cross-platform autostart - `task-mind autostart` manages server boot startup (macOS/Linux/Windows)
+- ✅ i18n support - UI internationalization with user language preferences
+- ✅ Web service mode - `task-mind server` launches browser-based GUI on port 8093
+
+**Core Infrastructure**:
+
+- ✅ Native CDP protocol layer (direct Chrome control, ~2MB lightweight)
+- ✅ Recipe metadata-driven architecture (chrome-js/python/shell runtime)
+- ✅ Run command system (topic-based task management, JSONL structured logs)
+- ✅ Web service backend (FastAPI + React frontend)
+- ✅ CLI tools and grouped command system
+
+See [Roadmap](https://github.com/DCDYSMRZ/Task-Mind/blob/main/docs/roadmap.md) for details
+
+---
+
+## License
+
+AGPL-3.0 License - see [LICENSE](https://github.com/DCDYSMRZ/Task-Mind/blob/main/LICENSE) file
+
+## Contributing
+
+Issues and Pull Requests are welcome!
+
+- Project issues: [Submit Issue](https://github.com/DCDYSMRZ/Task-Mind/issues)
+- Technical discussion: [Discussions](https://github.com/DCDYSMRZ/Task-Mind/discussions)
+
+### Contributors
+
+<a href="https://github.com/DCDYSMRZ/Task-Mind/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=DCDYSMRZ/Task-Mind" />
+</a>
+
+---
+
+Created with Claude Code | 2025-11
