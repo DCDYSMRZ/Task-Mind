@@ -577,26 +577,41 @@ def delete_session(
         Whether deletion was successful
     """
     import shutil
+    import sys
 
     session_dir = get_session_dir(session_id, agent_type)
+    
+    # Force print to stdout for debugging
+    print(f"[DELETE] Attempting to delete session {session_id}", file=sys.stderr)
+    print(f"[DELETE] Directory: {session_dir}", file=sys.stderr)
+    print(f"[DELETE] Directory exists: {session_dir.exists()}", file=sys.stderr)
     
     logger.info(f"Attempting to delete session {session_id}, directory: {session_dir}")
 
     if not session_dir.exists():
+        print(f"[DELETE] ERROR: Directory does not exist", file=sys.stderr)
         logger.warning(f"Session directory does not exist: {session_dir}")
         return False
 
     try:
+        print(f"[DELETE] Calling shutil.rmtree...", file=sys.stderr)
         shutil.rmtree(session_dir)
+        print(f"[DELETE] shutil.rmtree completed", file=sys.stderr)
         logger.info(f"Successfully deleted session: {session_id}")
         
         # Verify deletion
-        if session_dir.exists():
+        still_exists = session_dir.exists()
+        print(f"[DELETE] Directory still exists after rmtree: {still_exists}", file=sys.stderr)
+        
+        if still_exists:
+            print(f"[DELETE] ERROR: Directory still exists after deletion!", file=sys.stderr)
             logger.error(f"Session directory still exists after rmtree: {session_dir}")
             return False
             
+        print(f"[DELETE] SUCCESS: Directory deleted", file=sys.stderr)
         return True
     except Exception as e:
+        print(f"[DELETE] EXCEPTION: {e}", file=sys.stderr)
         logger.error(f"Failed to delete session {session_id}: {e}", exc_info=True)
         return False
 
