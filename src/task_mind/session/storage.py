@@ -579,16 +579,25 @@ def delete_session(
     import shutil
 
     session_dir = get_session_dir(session_id, agent_type)
+    
+    logger.info(f"Attempting to delete session {session_id}, directory: {session_dir}")
 
     if not session_dir.exists():
+        logger.warning(f"Session directory does not exist: {session_dir}")
         return False
 
     try:
         shutil.rmtree(session_dir)
-        logger.info(f"Deleted session: {session_id}")
+        logger.info(f"Successfully deleted session: {session_id}")
+        
+        # Verify deletion
+        if session_dir.exists():
+            logger.error(f"Session directory still exists after rmtree: {session_dir}")
+            return False
+            
         return True
     except Exception as e:
-        logger.error(f"Failed to delete session: {e}")
+        logger.error(f"Failed to delete session {session_id}: {e}", exc_info=True)
         return False
 
 
