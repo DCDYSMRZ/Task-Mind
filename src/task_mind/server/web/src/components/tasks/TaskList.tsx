@@ -10,7 +10,7 @@ import { Send, ClipboardList, Folder } from 'lucide-react';
 export default function TaskList() {
   const { t } = useTranslation();
   const { tasks, viewDetail, refresh } = useTasks();
-  const { config, updateConfig, showToast } = useAppStore();
+  const { config, updateConfig, showToast, removeTask } = useAppStore();
   const [prompt, setPrompt] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [executionMode, setExecutionMode] = useState<'agent' | 'do' | 'run'>('agent');
@@ -73,17 +73,29 @@ export default function TaskList() {
       return;
     }
 
+    // 立即从前端移除
+    removeTask(taskId);
+    showToast('正在删除...', 'info');
+
     try {
+      console.log('[TaskList] Deleting task:', taskId);
       const result = await api.deleteTask(taskId);
+      console.log('[TaskList] Delete result:', result);
+      
       if (result.status === 'ok') {
         showToast('任务已删除', 'success');
-        refresh?.();
+        // 延迟刷新以确保后端已更新
+        setTimeout(() => refresh?.(), 1000);
       } else {
         showToast(result.error || '删除失败', 'error');
+        // 删除失败，重新加载任务列表
+        refresh?.();
       }
     } catch (err) {
-      console.error('Delete task failed:', err);
+      console.error('[TaskList] Delete task failed:', err);
       showToast('删除任务失败', 'error');
+      // 删除失败，重新加载任务列表
+      refresh?.();
     }
   };
 

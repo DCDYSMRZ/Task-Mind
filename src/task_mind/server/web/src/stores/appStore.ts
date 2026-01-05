@@ -98,6 +98,7 @@ interface AppState {
 
   // Data sync actions (for WebSocket push)
   setTasks: (tasks: TaskItem[]) => void;
+  removeTask: (taskId: string) => void;
   setRecipes: (recipes: RecipeItem[]) => void;
   setCommunityRecipes: (recipes: CommunityRecipeItem[]) => void;
   setSkills: (skills: SkillItem[]) => void;
@@ -389,6 +390,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Data sync actions (for WebSocket push)
   setTasks: (tasks) => {
     set({ tasks });
+  },
+
+  removeTask: (taskId) => {
+    set((state) => ({
+      tasks: state.tasks.filter((task) => task.session_id !== taskId),
+    }));
   },
 
   setRecipes: (recipes) => {
