@@ -263,9 +263,9 @@ async def delete_task(task_id: str) -> ApiResponse:
     success = delete_session(task_id, AgentType.CLAUDE)
     
     if success:
-        # Invalidate cache
+        # Refresh cache
         cache = CacheService.get_instance()
-        await cache.invalidate_tasks()
+        await cache.refresh_tasks()
         
         return ApiResponse(status="ok", message=f"Task {task_id[:8]} deleted")
     else:
