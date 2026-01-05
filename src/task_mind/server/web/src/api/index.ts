@@ -112,6 +112,7 @@ export async function getTasks(options?: {
     last_activity: t.started_at,
     project_path: t.project_path ?? '',
     source: (t.source ?? 'unknown') as TaskItem['source'],
+    is_invalid: t.is_invalid,
   }));
 }
 

@@ -366,6 +366,59 @@ def read_summary(
         return None
 
 
+def read_sidechains(
+    session_id: str, agent_type: AgentType = AgentType.CLAUDE
+) -> List[Dict[str, Any]]:
+    """Read sidechain files associated with a session
+
+    Args:
+        session_id: Session ID
+        agent_type: Agent type
+
+    Returns:
+        List of sidechain info dictionaries
+    """
+    if agent_type != AgentType.CLAUDE:
+        return []
+    
+    # Get session metadata to find project path
+    metadata = read_metadata(session_id, agent_type)
+    if not metadata or not metadata.project_path:
+        return []
+    
+    from task_mind.session.sync import encode_project_path, CLAUDE_PROJECTS_DIR
+    
+    encoded_path = encode_project_path(metadata.project_path)
+    claude_project_dir = CLAUDE_PROJECTS_DIR / encoded_path
+    
+    if not claude_project_dir.exists():
+        return []
+    
+    sidechains = []
+    for sidechain_file in claude_project_dir.glob("agent-*.jsonl"):
+        try:
+            with open(sidechain_file, 'r', encoding='utf-8') as f:
+                first_line = f.readline()
+                if first_line:
+                    data = json.loads(first_line)
+                    if data.get("sessionId") == session_id:
+                        # Count lines to get step count
+                        step_count = sum(1 for _ in f) + 1  # +1 for first line
+                        
+                        sidechains.append({
+                            "agent_id": data.get("agentId", ""),
+                            "file_name": sidechain_file.name,
+                            "step_count": step_count,
+                            "timestamp": data.get("timestamp", ""),
+                        })
+        except Exception as e:
+            logger.warning(f"Failed to read sidechain {sidechain_file.name}: {e}")
+    
+    # Sort by timestamp
+    sidechains.sort(key=lambda x: x.get("timestamp", ""))
+    return sidechains
+
+
 # ============================================================
 # Session List Queries
 # ============================================================
@@ -596,10 +649,12 @@ def delete_session(
         from task_mind.session.sync import encode_project_path, CLAUDE_PROJECTS_DIR
         
         encoded_path = encode_project_path(metadata.project_path)
-        claude_session_file = CLAUDE_PROJECTS_DIR / encoded_path / f"{session_id}.jsonl"
+        claude_project_dir = CLAUDE_PROJECTS_DIR / encoded_path
+        claude_session_file = claude_project_dir / f"{session_id}.jsonl"
         
         print(f"[DELETE] Claude Code file: {claude_session_file}", file=sys.stderr)
         
+        # Delete main session file
         if claude_session_file.exists():
             try:
                 claude_session_file.unlink()
@@ -610,6 +665,27 @@ def delete_session(
                 return False
         else:
             print(f"[DELETE] Claude Code file does not exist", file=sys.stderr)
+        
+        # Delete sidechain files (agent-*.jsonl) associated with this session
+        if claude_project_dir.exists():
+            import json
+            deleted_sidechains = 0
+            for sidechain_file in claude_project_dir.glob("agent-*.jsonl"):
+                try:
+                    # Check if this sidechain belongs to the session
+                    with open(sidechain_file, 'r') as f:
+                        first_line = f.readline()
+                        if first_line:
+                            data = json.loads(first_line)
+                            if data.get("sessionId") == session_id:
+                                sidechain_file.unlink()
+                                deleted_sidechains += 1
+                                print(f"[DELETE] Deleted sidechain: {sidechain_file.name}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[DELETE] Failed to delete sidechain {sidechain_file.name}: {e}", file=sys.stderr)
+            
+            if deleted_sidechains > 0:
+                print(f"[DELETE] Deleted {deleted_sidechains} sidechain file(s)", file=sys.stderr)
 
     # Delete Task-Mind copy
     if not session_dir.exists():

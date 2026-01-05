@@ -218,6 +218,20 @@ export default function TaskDetail() {
                 <span className="text-[var(--text-muted)] shrink-0">{t('tasks.projectPath')}</span>
                 <span className="font-mono text-scaled-xs text-right break-all ml-scaled-4">{taskDetail.project_path}</span>
               </div>
+              {/* Sidechains */}
+              {taskDetail.sidechains && taskDetail.sidechains.length > 0 && (
+                <div className="mt-scaled-4 pt-scaled-4 border-t border-[var(--border-subtle)]">
+                  <div className="text-[var(--text-muted)] mb-scaled-2">Sidechains ({taskDetail.sidechains.length})</div>
+                  <div className="space-y-1">
+                    {taskDetail.sidechains.map((sidechain) => (
+                      <div key={sidechain.agent_id} className="flex justify-between items-center text-scaled-xs bg-[var(--bg-secondary)] px-scaled-2 py-scaled-1 rounded">
+                        <span className="font-mono text-[var(--text-muted)]">{sidechain.file_name}</span>
+                        <span className="text-[var(--text-muted)]">{sidechain.step_count} steps</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

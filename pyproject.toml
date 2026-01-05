@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9,<3.14"
 license = {text = "AGPL-3.0-or-later"}
 authors = [
-    {name = "Jamey Tsai", email = "caijia@task-mind.ai"}
+    {name = "DCDYSMRZ", email = "caijia@task-mind.ai"}
 ]
 keywords = ["cdp", "chrome", "devtools", "automation", "browser"]
 classifiers = [

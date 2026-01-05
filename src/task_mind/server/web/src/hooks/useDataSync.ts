@@ -5,7 +5,7 @@
  * Receives initial data on connect and incremental updates thereafter.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { MessageType, type WebSocketMessage } from '@/api/websocket';
 import { useAppStore } from '@/stores/appStore';
@@ -26,6 +26,7 @@ interface RawTaskData {
   step_count?: number;
   tool_call_count?: number;
   source?: string;
+  is_invalid?: boolean;
 }
 
 /**
@@ -85,6 +86,7 @@ function transformTaskData(raw: RawTaskData): TaskItem {
     last_activity: raw.started_at || '',
     project_path: raw.project_path ?? '',
     source: (raw.source ?? 'unknown') as TaskItem['source'],
+    is_invalid: raw.is_invalid,
   };
 }
 
@@ -281,6 +283,15 @@ export function useDataSync() {
     ],
     onMessage: handleMessage,
   });
+  
+  // Refresh data when reconnected
+  const loadTasks = useAppStore((state) => state.loadTasks);
+  useEffect(() => {
+    if (isConnected) {
+      console.log('[useDataSync] WebSocket connected, refreshing data...');
+      loadTasks();
+    }
+  }, [isConnected, loadTasks]);
 
   return { isConnected };
 }

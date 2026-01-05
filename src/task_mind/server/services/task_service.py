@@ -86,6 +86,8 @@ class TaskService:
 
                     task = TaskService._session_to_task(session, title_manager)
                     if task:
+                        # Mark invalid sessions
+                        task["is_invalid"] = TaskService._is_invalid_session(session)
                         tasks.append(task)
                 except Exception as e:
                     logger.debug("Failed to convert session: %s", e)
@@ -215,67 +217,51 @@ class TaskService:
     def _should_display(session) -> bool:
         """Determine if session should be displayed in task list.
 
-        Display criteria (any of):
-        1. Running task
-        2. Step count >= 10
-        3. Step count >= 5
+        Args:
+            session: Session metadata object.
 
-        Exclusion criteria:
-        1. Step count < 5 and completed
-        2. No assistant messages and step count < 10
+        Returns:
+            Always True - display all sessions.
+        """
+        return True
+
+    @staticmethod
+    def _is_invalid_session(session) -> bool:
+        """Check if session is invalid (system-only, no user interaction).
 
         Args:
             session: Session metadata object.
 
         Returns:
-            Whether session should be displayed.
+            True if session is invalid.
         """
         import json
         from task_mind.session.models import SessionStatus
         from task_mind.session.storage import get_session_dir
 
-        status = getattr(session, "status", None)
         step_count = getattr(session, "step_count", 0)
 
-        # Always display running tasks
-        if status == SessionStatus.RUNNING:
+        # Empty sessions are invalid
+        if step_count == 0:
             return True
 
-        # Display if step count >= 10
-        if step_count >= 10:
-            return True
+        # Check for assistant messages
+        session_dir = get_session_dir(session.session_id, session.agent_type)
+        steps_file = session_dir / "steps.jsonl"
+        if steps_file.exists():
+            try:
+                with open(steps_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        step = json.loads(line)
+                        if step.get("type") == "assistant_message":
+                            return False  # Has assistant message, valid
+            except Exception:
+                pass
 
-        # Don't display if step count < 5 and completed
-        if step_count < 5 and status == SessionStatus.COMPLETED:
-            return False
-
-        # Check for assistant messages if step_count < 10
-        if step_count < 10:
-            session_dir = get_session_dir(session.session_id, session.agent_type)
-            steps_file = session_dir / "steps.jsonl"
-            if steps_file.exists():
-                has_assistant = False
-                try:
-                    with open(steps_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if not line.strip():
-                                continue
-                            step = json.loads(line)
-                            if step.get("type") == "assistant_message":
-                                has_assistant = True
-                                break
-                except Exception:
-                    pass
-
-                # No assistant messages → system session, don't display
-                if not has_assistant:
-                    return False
-
-        # Display if step count >= 5
-        if step_count >= 5:
-            return True
-
-        return False
+        # No assistant messages found
+        return True
 
     @staticmethod
     def get_task(session_id: str) -> Optional[Dict[str, Any]]:
@@ -293,6 +279,7 @@ class TaskService:
                 read_metadata,
                 read_steps_paginated,
                 read_summary,
+                read_sidechains,
             )
 
             if not session_id:
@@ -311,10 +298,13 @@ class TaskService:
 
             # Read summary
             summary = read_summary(session_id, AgentType.CLAUDE)
+            
+            # Read sidechains
+            sidechains = read_sidechains(session_id, AgentType.CLAUDE)
 
             # Build task detail
             return TaskService._build_task_detail(
-                session, steps, summary, steps_result
+                session, steps, summary, steps_result, sidechains
             )
 
         except Exception as e:
@@ -327,6 +317,7 @@ class TaskService:
         steps: List[Any],
         summary: Optional[Any],
         steps_result: Dict[str, Any],
+        sidechains: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Build task detail dictionary from session data.
 
@@ -335,6 +326,7 @@ class TaskService:
             steps: List of step records.
             summary: Session summary or None.
             steps_result: Pagination info for steps.
+            sidechains: List of sidechain info or None.
 
         Returns:
             Task detail dictionary.
@@ -383,6 +375,7 @@ class TaskService:
             "steps_offset": steps_result.get("offset", 0),
             "has_more_steps": steps_result.get("has_more", False),
             "summary": summary_dict,
+            "sidechains": sidechains or [],
         }
 
     @staticmethod

@@ -78,6 +78,7 @@ export interface TaskItem {
   step_count: number;
   tool_call_count: number;
   source: string;  // terminal, web, or unknown
+  is_invalid?: boolean;  // true if session has no user interaction
 }
 
 export interface TaskStep {
@@ -103,6 +104,13 @@ export interface TaskSummary {
   most_used_tools: ToolUsageStat[];
 }
 
+export interface Sidechain {
+  agent_id: string;
+  file_name: string;
+  step_count: number;
+  timestamp: string;
+}
+
 export interface TaskDetail {
   id: string;
   title: string;
@@ -118,6 +126,7 @@ export interface TaskDetail {
   steps_offset: number;
   has_more_steps: boolean;
   summary: TaskSummary | null;
+  sidechains: Sidechain[];
 }
 
 export interface TaskListResponse {

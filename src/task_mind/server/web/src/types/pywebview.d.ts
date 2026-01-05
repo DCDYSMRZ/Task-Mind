@@ -48,6 +48,7 @@ export interface TaskItem {
   last_activity: string;
   project_path: string;
   source: SessionSource;
+  is_invalid?: boolean;
 }
 
 export interface TaskStep {
@@ -75,6 +76,13 @@ export interface TaskSummary {
   most_used_tools: ToolUsageStat[];
 }
 
+export interface Sidechain {
+  agent_id: string;
+  file_name: string;
+  step_count: number;
+  timestamp: string;
+}
+
 export interface TaskDetail {
   session_id: string;
   name: string;
@@ -92,6 +100,7 @@ export interface TaskDetail {
   steps_offset: number;
   has_more_steps: boolean;
   summary: TaskSummary | null;
+  sidechains?: Sidechain[];
   error?: string;
 }
 

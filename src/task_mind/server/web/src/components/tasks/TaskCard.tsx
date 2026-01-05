@@ -46,6 +46,11 @@ export default function TaskCard({ task, onClick, onDelete }: TaskCardProps) {
   const { label: statusLabel, Icon: StatusIcon } = statusConfig[task.status] || statusConfig.completed;
   const isRunning = task.status === 'running';
 
+  // Debug: log task data
+  if (task.step_count < 5) {
+    console.log('TaskCard task:', task.session_id.slice(0, 8), 'is_invalid:', task.is_invalid, 'step_count:', task.step_count);
+  }
+
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onDelete) {
@@ -64,6 +69,11 @@ export default function TaskCard({ task, onClick, onDelete }: TaskCardProps) {
       <div className="task-main">
         <div className="task-header">
           <span className="task-title" title={task.name}>{task.name}</span>
+          {task.is_invalid && (
+            <span className="px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded" title="无用户交互的系统会话">
+              无效
+            </span>
+          )}
           <span className="task-time">{formatRelativeTime(task.started_at)}</span>
         </div>
 

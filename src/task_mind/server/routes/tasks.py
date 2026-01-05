@@ -89,6 +89,7 @@ async def list_tasks(
                 step_count=t.get("step_count", 0),
                 tool_call_count=t.get("tool_call_count", 0),
                 source=t.get("source", "unknown"),
+                is_invalid=t.get("is_invalid", False),
             )
         )
 

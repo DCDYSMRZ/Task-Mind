@@ -9,7 +9,7 @@ import logging
 import threading
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 # Sync interval in seconds (same as deprecated GUI for fast session discovery)
 SYNC_INTERVAL_SECONDS = 5
@@ -93,13 +93,16 @@ class SyncService:
                         f"Session sync: synced={result.get('synced', 0)}, "
                         f"updated={result.get('updated', 0)}"
                     )
-
+                    
                     # Refresh cache and broadcast updates
                     if self._cache_service is not None:
                         try:
                             await self._cache_service.refresh_tasks(broadcast=True)
+                            logger.info("Cache refreshed and broadcasted to clients")
                         except Exception as e:
                             logger.warning(f"Failed to refresh cache: {e}")
+                else:
+                    logger.info("Session sync: no changes detected")
 
             except Exception as e:
                 logger.warning(f"Session sync failed: {e}")

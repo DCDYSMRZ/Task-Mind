@@ -35,6 +35,9 @@ export type PageType =
 
 // Sidebar storage key for localStorage
 const SIDEBAR_COLLAPSED_KEY = 'task-mind-sidebar-collapsed';
+const CONSOLE_SESSION_KEY = 'task-mind-console-session';
+const CONSOLE_MESSAGES_KEY = 'task-mind-console-messages';
+const CONSOLE_RUNNING_KEY = 'task-mind-console-running';
 
 // Toast type
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
@@ -149,6 +152,27 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
+// Helper to get initial console state from localStorage
+function getInitialConsoleState() {
+  try {
+    const sessionId = localStorage.getItem(CONSOLE_SESSION_KEY);
+    const messagesStr = localStorage.getItem(CONSOLE_MESSAGES_KEY);
+    const runningStr = localStorage.getItem(CONSOLE_RUNNING_KEY);
+    
+    return {
+      consoleSessionId: sessionId || null,
+      consoleMessages: messagesStr ? JSON.parse(messagesStr) : [],
+      consoleIsRunning: runningStr === 'true',
+    };
+  } catch {
+    return {
+      consoleSessionId: null,
+      consoleMessages: [],
+      consoleIsRunning: false,
+    };
+  }
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state - default to 'tasks' page per spec
   currentPage: 'tasks',
@@ -168,10 +192,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   dataVersion: 0,
   dataInitialized: false,
 
-  // Console initial state
-  consoleSessionId: null,
-  consoleMessages: [],
-  consoleIsRunning: false,
+  // Console initial state - restored from localStorage
+  ...getInitialConsoleState(),
   consoleScrollPosition: 0,
 
   // Page switching
@@ -454,12 +476,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Console actions
   setConsoleSessionId: (id) => {
     set({ consoleSessionId: id });
+    try {
+      if (id) {
+        localStorage.setItem(CONSOLE_SESSION_KEY, id);
+      } else {
+        localStorage.removeItem(CONSOLE_SESSION_KEY);
+      }
+    } catch {
+      // localStorage not available
+    }
   },
 
   addConsoleMessage: (message) => {
-    set((state) => ({
-      consoleMessages: [...state.consoleMessages, message],
-    }));
+    set((state) => {
+      const newMessages = [...state.consoleMessages, message];
+      try {
+        localStorage.setItem(CONSOLE_MESSAGES_KEY, JSON.stringify(newMessages));
+      } catch {
+        // localStorage not available
+      }
+      return { consoleMessages: newMessages };
+    });
   },
 
   updateLastConsoleMessage: (update) => {
@@ -467,26 +504,46 @@ export const useAppStore = create<AppState>((set, get) => ({
       const messages = state.consoleMessages;
       if (messages.length === 0) return state;
       const last = messages[messages.length - 1];
-      return {
-        consoleMessages: [...messages.slice(0, -1), { ...last, ...update }],
-      };
+      const newMessages = [...messages.slice(0, -1), { ...last, ...update }];
+      try {
+        localStorage.setItem(CONSOLE_MESSAGES_KEY, JSON.stringify(newMessages));
+      } catch {
+        // localStorage not available
+      }
+      return { consoleMessages: newMessages };
     });
   },
 
   updateConsoleMessageByToolCallId: (toolCallId, update) => {
-    set((state) => ({
-      consoleMessages: state.consoleMessages.map((msg) =>
+    set((state) => {
+      const newMessages = state.consoleMessages.map((msg) =>
         msg.tool_call_id === toolCallId ? { ...msg, ...update } : msg
-      ),
-    }));
+      );
+      try {
+        localStorage.setItem(CONSOLE_MESSAGES_KEY, JSON.stringify(newMessages));
+      } catch {
+        // localStorage not available
+      }
+      return { consoleMessages: newMessages };
+    });
   },
 
   setConsoleMessages: (messages) => {
     set({ consoleMessages: messages });
+    try {
+      localStorage.setItem(CONSOLE_MESSAGES_KEY, JSON.stringify(messages));
+    } catch {
+      // localStorage not available
+    }
   },
 
   setConsoleIsRunning: (running) => {
     set({ consoleIsRunning: running });
+    try {
+      localStorage.setItem(CONSOLE_RUNNING_KEY, String(running));
+    } catch {
+      // localStorage not available
+    }
   },
 
   setConsoleScrollPosition: (position) => {
@@ -500,5 +557,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       consoleIsRunning: false,
       consoleScrollPosition: 0,
     });
+    try {
+      localStorage.removeItem(CONSOLE_SESSION_KEY);
+      localStorage.removeItem(CONSOLE_MESSAGES_KEY);
+      localStorage.removeItem(CONSOLE_RUNNING_KEY);
+    } catch {
+      // localStorage not available
+    }
   },
 }));

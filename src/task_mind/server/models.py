@@ -146,6 +146,7 @@ class TaskItemResponse(BaseModel):
     step_count: int = 0
     tool_call_count: int = 0
     source: str = "unknown"  # terminal, web, or unknown
+    is_invalid: bool = False  # true if session has no user interaction
 
 
 class TaskStepResponse(BaseModel):
@@ -177,6 +178,15 @@ class TaskSummaryResponse(BaseModel):
     most_used_tools: List[ToolUsageStatResponse] = Field(default_factory=list)
 
 
+class SidechainResponse(BaseModel):
+    """Sidechain (agent-*) file info"""
+
+    agent_id: str
+    file_name: str
+    step_count: int
+    timestamp: str
+
+
 class TaskDetailResponse(BaseModel):
     """Response for task detail endpoint"""
 
@@ -194,6 +204,7 @@ class TaskDetailResponse(BaseModel):
     steps_offset: int = 0
     has_more_steps: bool = False
     summary: Optional[TaskSummaryResponse] = None
+    sidechains: List[SidechainResponse] = Field(default_factory=list)
 
 
 class TaskListResponse(BaseModel):

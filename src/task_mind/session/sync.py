@@ -30,7 +30,7 @@ from task_mind.session.storage import (
     write_summary,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 # Claude Code session directory
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
@@ -69,7 +69,18 @@ def encode_project_path(project_path: str) -> str:
     # 3. Claude Code uses hyphens to encode paths
     # Replace both / and . with -
     # /home/yammi/.task-mind -> -home-yammi--task-mind
-    return normalized.replace("/", "-").replace(".", "-")
+    encoded = normalized.replace("/", "-").replace(".", "-")
+    
+    # 4. Replace non-ASCII characters with -
+    # Claude Code replaces non-ASCII chars (e.g., Chinese) with -
+    result = ""
+    for char in encoded:
+        if ord(char) < 128:
+            result += char
+        else:
+            result += "-"
+    
+    return result
 
 
 def decode_project_path(encoded: str) -> str:
@@ -140,7 +151,16 @@ def infer_session_status(
     for record in reversed(records[-10:]):  # Only check last few records
         record_type = record.get("type")
         if record_type == "summary":
+            logger.info("Session has summary record, marking as COMPLETED")
             return SessionStatus.COMPLETED
+        
+        # Check for end_turn in assistant messages
+        if record_type == "assistant":
+            message = record.get("message", {})
+            stop_reason = message.get("stop_reason")
+            if stop_reason == "end_turn":
+                logger.info("Session has end_turn stop_reason, marking as COMPLETED")
+                return SessionStatus.COMPLETED
 
     # Check last activity time
     now = datetime.now(timezone.utc)
@@ -148,8 +168,10 @@ def infer_session_status(
         last_activity = last_activity.replace(tzinfo=timezone.utc)
 
     delta = now - last_activity
+    logger.info(f"Session last activity: {last_activity}, now: {now}, delta: {delta.total_seconds():.0f}s")
     if delta > timedelta(minutes=INACTIVITY_TIMEOUT_MINUTES):
         # No activity for more than 5 minutes, consider completed
+        logger.info(f"Session inactive for {delta.total_seconds():.0f}s (>{INACTIVITY_TIMEOUT_MINUTES}min), marking as COMPLETED")
         return SessionStatus.COMPLETED
 
     return SessionStatus.RUNNING
@@ -298,10 +320,17 @@ def sync_session(
             if existing.status != SessionStatus.RUNNING:
                 logger.debug(f"Session already exists and no updates: {session_id}")
                 return None
+            else:
+                logger.info(f"Re-checking RUNNING session status: {session_id}")
 
     # Infer status
     last_activity = parsed["last_timestamp"] or datetime.now(timezone.utc)
     status = infer_session_status(parsed["records"], last_activity)
+    
+    if existing:
+        logger.info(f"Session {session_id}: {existing.status} -> {status}")
+    else:
+        logger.info(f"New session {session_id}: status={status}")
 
     # Extract session name from first user message (truncate to 100 chars)
     session_name = None
@@ -427,10 +456,11 @@ def sync_project_sessions(
             logger.warning(error_msg)
             result.errors.append(error_msg)
 
-    logger.info(
-        f"Sync complete: synced={result.synced}, updated={result.updated}, "
-        f"skipped={result.skipped}, errors={len(result.errors)}"
-    )
+    if result.synced > 0 or result.updated > 0:
+        logger.info(
+            f"Sync complete for {project_path}: synced={result.synced}, updated={result.updated}, "
+            f"skipped={result.skipped}, errors={len(result.errors)}"
+        )
     return result
 
 
@@ -450,12 +480,35 @@ def sync_all_projects(force: bool = False) -> SyncResult:
         logger.debug(f"Claude project directory does not exist: {CLAUDE_PROJECTS_DIR}")
         return result
 
+    logger.info(f"Scanning Claude projects in: {CLAUDE_PROJECTS_DIR}")
     for project_dir in CLAUDE_PROJECTS_DIR.iterdir():
         if not project_dir.is_dir():
             continue
 
-        # Decode project path (supports Windows and Unix)
-        project_path = decode_project_path(project_dir.name)
+        logger.info(f"Found project directory: {project_dir.name}")
+        
+        # Read project path from first JSONL file's cwd field
+        project_path = None
+        for jsonl_file in project_dir.glob("*.jsonl"):
+            if not is_main_session_file(jsonl_file.name):
+                continue
+            try:
+                with open(jsonl_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        record = json.loads(line.strip())
+                        if "cwd" in record:
+                            project_path = record["cwd"]
+                            break
+                if project_path:
+                    break
+            except Exception:
+                continue
+        
+        if not project_path:
+            logger.debug(f"Could not determine project path for {project_dir.name} (no session files found)")
+            continue
+            
+        logger.info(f"Detected project path: {project_path}")
 
         # Sync this project
         project_result = sync_project_sessions(project_path, force)

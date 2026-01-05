@@ -1,4 +1,5 @@
 import type { ConsoleMessage } from '@/types/console';
+import MarkdownContent from '../ui/MarkdownContent';
 import BashContent from '../tasks/content/BashContent';
 import JsonContent from '../tasks/content/JsonContent';
 
@@ -55,8 +56,8 @@ export default function MessageItem({ message }: MessageItemProps) {
               <span className="text-scaled-xs text-[var(--accent-warning)]">typing...</span>
             )}
           </div>
-          <div className="text-[var(--text-primary)] whitespace-pre-wrap break-words">
-            {message.content}
+          <div className="text-[var(--text-primary)]">
+            <MarkdownContent content={message.content} />
             {!message.done && <span className="inline-block w-2 h-4 bg-[var(--accent-primary)] ml-1 animate-pulse" />}
           </div>
         </div>

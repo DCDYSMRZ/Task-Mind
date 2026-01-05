@@ -108,14 +108,19 @@ class ConsoleSession:
         # Start subprocess
         try:
             logger.info(f"Starting Claude CLI with command: {cmd} in {self.project_path}")
+            
+            # Create environment with unbuffered output
+            env = get_utf8_env()
+            env['PYTHONUNBUFFERED'] = '1'
+            
             self.process = subprocess.Popen(
                 prepare_command_for_windows(cmd),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                bufsize=1,
-                env=get_utf8_env(),
+                bufsize=0,  # No buffering for real-time output
+                env=env,
                 cwd=self.project_path,
             )
 
@@ -142,10 +147,24 @@ class ConsoleSession:
             self._reader_task = asyncio.create_task(self._read_stream())
 
             logger.info(f"Console session {self.session_id[:8]} started (PID: {self.process.pid})")
+            
+            # Schedule cache refresh after a short delay to show new task in list
+            asyncio.create_task(self._delayed_cache_refresh())
 
         except Exception as e:
             logger.error(f"Failed to start console session: {e}")
             raise
+    
+    async def _delayed_cache_refresh(self) -> None:
+        """Refresh task cache after delay to show new session in task list."""
+        await asyncio.sleep(3)  # Wait for Claude to create session file
+        try:
+            from task_mind.server.services.cache_service import CacheService
+            cache_service = CacheService.get_instance()
+            await cache_service.refresh_tasks(broadcast=True)
+            logger.info("Task cache refreshed after console session started")
+        except Exception as e:
+            logger.warning(f"Failed to refresh task cache: {e}")
 
     async def send_message(self, message: str) -> None:
         """Send a message to the running Claude session.
@@ -202,6 +221,10 @@ class ConsoleSession:
 
         logger.info(f"Resuming Claude session {self._claude_session_id[:8]}...")
 
+        # Create environment with unbuffered output
+        env = get_utf8_env()
+        env['PYTHONUNBUFFERED'] = '1'
+
         # Start new process with --resume
         self.process = subprocess.Popen(
             prepare_command_for_windows(cmd),
@@ -209,8 +232,8 @@ class ConsoleSession:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1,
-            env=get_utf8_env(),
+            bufsize=0,  # No buffering for real-time output
+            env=env,
             cwd=self.project_path,
         )
 
@@ -300,6 +323,15 @@ class ConsoleSession:
                     "status": "completed",
                 }
             )
+            
+            # Trigger immediate cache refresh so task list updates without waiting for next sync cycle
+            try:
+                from task_mind.server.services.cache_service import CacheService
+                cache_service = CacheService.get_instance()
+                await cache_service.refresh_tasks(broadcast=True)
+                logger.info("Task cache refreshed after console session completed")
+            except Exception as e:
+                logger.warning(f"Failed to refresh task cache: {e}")
 
     async def _handle_stream_event(self, event: Dict[str, Any]) -> None:
         """Parse and handle stream-json events.

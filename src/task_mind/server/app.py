@@ -50,32 +50,43 @@ async def lifespan(app: FastAPI):
     - Start community recipe refresh service
     - Stop services on shutdown
     """
+    import logging
+    logger = logging.getLogger("uvicorn")
+    
     # Startup: Initialize cache first (preload all data)
+    logger.info("Starting application services...")
     cache_service = CacheService.get_instance()
     await cache_service.initialize()
+    logger.info("Cache service initialized")
 
     # Start sync service and link to cache
     sync_service = SyncService.get_instance()
     sync_service.set_cache_service(cache_service)
     await sync_service.start()
+    logger.info("Sync service started")
 
     # Start community recipe service (60s refresh interval)
     community_service = CommunityRecipeService.get_instance()
     community_service.set_cache_service(cache_service)
     await community_service.start()
+    logger.info("Community recipe service started")
 
     # Start session mapper for PTY sessions
     from task_mind.server.services.terminal_service import terminal_service
     from task_mind.server.services.session_mapper import get_session_mapper
     mapper = get_session_mapper(terminal_service)
     await mapper.start()
+    logger.info("Session mapper started")
+    logger.info("All services started successfully")
 
     yield
 
     # Shutdown
+    logger.info("Shutting down services...")
     await mapper.stop()
     await community_service.stop()
     await sync_service.stop()
+    logger.info("All services stopped")
 
 
 def get_frontend_path() -> Path:
