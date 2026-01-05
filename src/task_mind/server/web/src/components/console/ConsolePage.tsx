@@ -196,13 +196,14 @@ export default function ConsolePage() {
     try {
       if (!consoleSessionId) {
         // Start new session
+        console.log('[Console] Starting session with project_path:', projectPath);
         const response = await fetch('/api/console/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: finalInput,
             auto_approve: true,
-            project_path: projectPath || undefined,
+            project_path: projectPath || null,
           }),
         });
 
@@ -260,8 +261,11 @@ export default function ConsolePage() {
 
   const handleSelectDirectory = async () => {
     try {
+      console.log('[Console] Selecting directory...');
       const result = await api.selectDirectory();
+      console.log('[Console] Select directory result:', result);
       if (result.status === 'ok' && result.path) {
+        console.log('[Console] Setting project path to:', result.path);
         setProjectPath(result.path);
       } else if (result.status === 'error') {
         showToast(result.error || 'Failed to select directory', 'error');
