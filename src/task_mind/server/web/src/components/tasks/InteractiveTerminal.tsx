@@ -60,8 +60,9 @@ export default function InteractiveTerminal({ sessionId }: InteractiveTerminalPr
     // 连接WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/terminal/${sessionId}`;
-    console.log('Connecting to WebSocket:', wsUrl);
     const ws = new WebSocket(wsUrl);
+    // Receive PTY output as binary to avoid corrupting ANSI sequences
+    ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -75,16 +76,30 @@ export default function InteractiveTerminal({ sessionId }: InteractiveTerminalPr
     };
 
     ws.onmessage = (event) => {
-      console.log('WebSocket message received:', event.data);
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'output') {
-          term.write(message.data);
-        } else if (message.type === 'error') {
-          term.write(`\r\n\x1b[31mError: ${message.message}\x1b[0m\r\n`);
+      // Server may send:
+      // - binary PTY bytes (preferred)
+      // - JSON error messages
+      const data = event.data as unknown;
+      if (typeof data === 'string') {
+        try {
+          const message = JSON.parse(data) as { type?: string; message?: string };
+          if (message.type === 'error') {
+            term.write(`\r\n\x1b[31mError: ${message.message || 'Unknown error'}\x1b[0m\r\n`);
+          }
+        } catch {
+          // If it's plain text, write it directly
+          term.write(data);
         }
-      } catch (error) {
-        console.error('Failed to parse terminal message:', error);
+        return;
+      }
+
+      // ArrayBuffer (binaryType='arraybuffer') or Blob (browser dependent)
+      if (data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(data));
+        return;
+      }
+      if (data instanceof Blob) {
+        data.arrayBuffer().then((buf) => term.write(new Uint8Array(buf)));
       }
     };
 

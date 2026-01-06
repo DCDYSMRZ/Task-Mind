@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 class TerminalSession:
     """Manages a PTY-based terminal session."""
 
-    def __init__(self, session_id: str, command: list[str], cwd: Optional[str] = None):
+    def __init__(self, session_id: str, command: list[str], cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None):
         self.session_id = session_id
         self.command = command
         self.cwd = cwd or str(Path.home())
+        self.env = env
         self.master_fd: Optional[int] = None
         self.pid: Optional[int] = None
         self._running = False
@@ -55,6 +56,11 @@ class TerminalSession:
             env = get_utf8_env()
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
+            
+            # Merge custom env if provided
+            if self.env:
+                env.update(self.env)
+            
             os.execvpe(self.command[0], self.command, env)
         
         # Parent process
@@ -70,8 +76,14 @@ class TerminalSession:
             None, os.write, self.master_fd, data.encode('utf-8')
         )
 
-    async def read(self) -> Optional[str]:
-        """Read data from terminal (non-blocking)."""
+    async def read(self) -> Optional[bytes]:
+        """Read raw bytes from terminal (non-blocking).
+        
+        IMPORTANT: PTY output contains ANSI control sequences. Decoding with
+        errors='replace' can corrupt these sequences (shows up as '�' chars) and
+        breaks in-place rendering. We therefore keep bytes intact and let the
+        client terminal (xterm.js) interpret them.
+        """
         if self.master_fd is None:
             return None
         
@@ -94,8 +106,7 @@ class TerminalSession:
             if not data:
                 # EOF reached (process exited)
                 raise EOFError("PTY closed")
-            
-            return data.decode('utf-8', errors='replace')
+            return data
         
         except (OSError, EOFError):
             raise EOFError("PTY closed")
@@ -231,7 +242,7 @@ class TerminalService:
                 "error": f"Working directory does not exist: {cwd}"
             }
         
-        session = TerminalSession(session_id, command, cwd)
+        session = TerminalSession(session_id, command, cwd, env)
         
         try:
             await session.start()

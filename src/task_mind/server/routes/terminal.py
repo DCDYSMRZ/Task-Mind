@@ -22,7 +22,8 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
     Protocol:
     - Client -> Server: {"type": "input", "data": "..."}
     - Client -> Server: {"type": "resize", "rows": 24, "cols": 80}
-    - Server -> Client: {"type": "output", "data": "..."}
+    - Server -> Client (binary): raw PTY bytes (ANSI + UTF-8 text mixed)
+    - Server -> Client (json): {"type": "error", "message": "..."}
     """
     try:
         logger.info(f"WebSocket connection attempt for session {session_id[:8]}")
@@ -117,6 +118,7 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
             
             # Force color output
             color_env = os.environ.copy()
+            color_env.pop('NO_COLOR', None)  # Remove NO_COLOR to avoid conflict
             color_env.update({
                 'FORCE_COLOR': '1',
                 'TERM': 'xterm-256color',
@@ -150,13 +152,13 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
             try:
                 data = await session.read()
                 if data:
-                    await websocket.send_json({"type": "output", "data": data})
+                    await websocket.send_bytes(data)
                 else:
                     await asyncio.sleep(0.05)
             except EOFError:
                 logger.info(f"Terminal session {session_id[:8]} ended (EOF)")
                 try:
-                    await websocket.send_json({"type": "output", "data": "\r\n[Session ended]\r\n"})
+                    await websocket.send_bytes(b"\r\n[Session ended]\r\n")
                     await websocket.close()
                 except:
                     pass

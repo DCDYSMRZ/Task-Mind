@@ -28,13 +28,12 @@ export default function ConsoleInput({
     <div className="card">
       <div className="flex gap-scaled-3 items-end">
         <textarea
-          className="flex-1 resize-none bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)] font-sans text-scaled-base p-0"
+          className="flex-1 resize-none bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)] font-sans text-scaled-base p-0 h-20 overflow-y-auto"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          rows={3}
           aria-label="Message input"
         />
         <button

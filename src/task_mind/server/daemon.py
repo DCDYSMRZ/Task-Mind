@@ -215,7 +215,7 @@ def start_daemon() -> Tuple[bool, str]:
     cmd = [
         sys.executable,
         "-m",
-        "task-mind.server.runner",
+        "task_mind.server.runner",
         "--daemon",
     ]
 

@@ -55,9 +55,17 @@ export default function ConsolePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on unmount
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change (only if user is near bottom)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    // Check if user is near bottom (within 100px)
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
   }, [consoleMessages]);
 
   // WebSocket connection
@@ -123,17 +131,33 @@ export default function ConsolePage() {
       case 'console_assistant_thinking': {
         // Streaming assistant response
         const last = messages[messages.length - 1];
+        const newContent = data.content as string;
+        
         if (last?.type === 'assistant' && !last.done) {
-          // Update existing streaming message
+          let updatedContent = last.content + newContent;
+          
+          // Process all \r (carriage return) to handle in-place updates
+          // Split by \n first to process each line separately
+          const lines = updatedContent.split('\n');
+          const processedLines = lines.map(line => {
+            // If line contains \r, keep only the content after the last \r
+            if (line.includes('\r')) {
+              const parts = line.split('\r');
+              return parts[parts.length - 1];
+            }
+            return line;
+          });
+          updatedContent = processedLines.join('\n');
+          
           updateLastConsoleMessage({
-            content: last.content + (data.content as string),
+            content: updatedContent,
             done: data.done as boolean,
           });
         } else if (!data.done) {
           // Start new streaming message
           addConsoleMessage({
             type: 'assistant',
-            content: data.content as string,
+            content: newContent,
             timestamp: new Date().toISOString(),
             done: false,
           });
@@ -217,10 +241,11 @@ export default function ConsolePage() {
         showToast('Console session started', 'success');
       } else {
         // Continue existing session
+        setConsoleIsRunning(true);
         const response = await fetch(`/api/console/${consoleSessionId}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: inputValue }),
+          body: JSON.stringify({ message: finalInput }),
         });
 
         if (!response.ok) {
@@ -289,7 +314,7 @@ export default function ConsolePage() {
       </div>
 
       {/* Message area */}
-      <div ref={scrollContainerRef} className="flex-1 min-h-0 card overflow-hidden flex flex-col overflow-y-auto">
+      <div className="flex-1 min-h-0 card overflow-hidden flex flex-col">
         {!consoleSessionId && consoleMessages.length === 0 && (
           <div className="p-scaled-4 flex flex-col gap-scaled-4">
             {/* Purpose tip */}
@@ -312,7 +337,11 @@ export default function ConsolePage() {
             </div>
           </div>
         )}
-        <MessageList messages={consoleMessages} messagesEndRef={messagesEndRef} />
+        <MessageList
+          messages={consoleMessages}
+          messagesEndRef={messagesEndRef}
+          scrollContainerRef={scrollContainerRef}
+        />
       </div>
 
       {/* Input area */}

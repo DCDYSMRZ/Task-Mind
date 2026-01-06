@@ -6,9 +6,10 @@ import type { ConsoleMessage } from '@/types/console';
 interface MessageListProps {
   messages: ConsoleMessage[];
   messagesEndRef: RefObject<HTMLDivElement>;
+  scrollContainerRef?: RefObject<HTMLDivElement>;
 }
 
-export default function MessageList({ messages, messagesEndRef }: MessageListProps) {
+export default function MessageList({ messages, messagesEndRef, scrollContainerRef }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] p-scaled-8">
@@ -24,7 +25,7 @@ export default function MessageList({ messages, messagesEndRef }: MessageListPro
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-scaled-4 space-y-4">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-scaled-4 space-y-4">
       {messages.map((msg, index) => (
         <MessageItem key={index} message={msg} />
       ))}

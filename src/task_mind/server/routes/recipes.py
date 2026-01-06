@@ -24,6 +24,23 @@ from task_mind.server.services.recipe_service import RecipeService
 router = APIRouter()
 
 
+@router.post("/recipes/refresh")
+async def refresh_recipes():
+    """Refresh recipe cache from filesystem.
+    
+    Useful after creating recipes via CLI or external tools.
+    """
+    cache = CacheService.get_instance()
+    await cache.refresh_recipes(broadcast=True)
+    
+    recipes = await cache.get_recipes()
+    return {
+        "status": "ok",
+        "count": len(recipes),
+        "message": f"Refreshed {len(recipes)} recipes"
+    }
+
+
 @router.get("/recipes", response_model=List[RecipeItemResponse])
 async def list_recipes() -> List[RecipeItemResponse]:
     """List all available recipes.

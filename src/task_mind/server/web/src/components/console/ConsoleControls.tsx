@@ -60,7 +60,6 @@ export default function ConsoleControls({
               type="button"
               className="btn btn-ghost flex items-center gap-scaled-2"
               onClick={onNewSession}
-              disabled={!sessionId}
             >
               <PlusCircle className="icon-scaled-sm" />
               {t('console.newSession')}

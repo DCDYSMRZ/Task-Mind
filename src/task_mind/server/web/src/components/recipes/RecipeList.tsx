@@ -5,7 +5,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import RecipeTabs from './RecipeTabs';
 import CommunityRecipeList from './CommunityRecipeList';
 import type { RecipeItem } from '@/types/pywebview';
-import { Package, Search, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Package, Search, X, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 
 // Get source tag classes
 function getSourceClasses(source: RecipeItem['source']): string {
@@ -117,11 +117,12 @@ function CollapsibleSection({
 
 export default function RecipeList() {
   const { t } = useTranslation();
-  const { recipes, loadRecipes, communityRecipes, loadCommunityRecipes, switchPage } = useAppStore();
+  const { recipes, loadRecipes, communityRecipes, loadCommunityRecipes, switchPage, showToast } = useAppStore();
   const [search, setSearch] = useState('');
   const [atomicExpanded, setAtomicExpanded] = useState(true);
   const [workflowExpanded, setWorkflowExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<'local' | 'community'>('local');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadRecipes();
@@ -130,6 +131,23 @@ export default function RecipeList() {
   useEffect(() => {
     loadCommunityRecipes();
   }, [loadCommunityRecipes]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch('/api/recipes/refresh', { method: 'POST' });
+      if (response.ok) {
+        await loadRecipes();
+        showToast(t('recipes.refreshSuccess') || 'Recipes refreshed', 'success');
+      } else {
+        showToast(t('recipes.refreshFailed') || 'Failed to refresh', 'error');
+      }
+    } catch (error) {
+      showToast(t('recipes.refreshFailed') || 'Failed to refresh', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter and group recipes
   const { atomicRecipes, workflowRecipes } = useMemo(() => {
@@ -174,8 +192,9 @@ export default function RecipeList() {
             />
           ) : (
             <>
-              {/* Search box */}
-              <div className="search-box">
+              {/* Search box with refresh button */}
+              <div className="flex gap-scaled-2 mb-scaled-4">
+                <div className="search-box flex-1">
                 <Search size={16} className="search-icon" />
                 <input
                   type="text"
@@ -195,6 +214,16 @@ export default function RecipeList() {
                     <X size={14} />
                   </button>
                 )}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  title={t('recipes.refresh') || 'Refresh'}
+                >
+                  <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                </button>
               </div>
 
               {/* Recipe list */}

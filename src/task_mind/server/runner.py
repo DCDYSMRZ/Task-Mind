@@ -4,7 +4,7 @@ Provides functions to start and manage the Uvicorn server
 for hosting the Task-Mind GUI web application.
 
 Can be run as a module for daemon mode:
-    python -m task-mind.server.runner --daemon
+    python -m task_mind.server.runner --daemon
 """
 
 import logging

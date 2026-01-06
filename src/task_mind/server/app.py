@@ -71,6 +71,13 @@ async def lifespan(app: FastAPI):
     await community_service.start()
     logger.info("Community recipe service started")
 
+    # Start resource watcher for auto-refresh
+    import asyncio
+    from task_mind.server.services.resource_watcher import ResourceWatcher
+    watcher = ResourceWatcher.get_instance()
+    watcher.start(cache_service, asyncio.get_event_loop())
+    logger.info("Resource watcher started")
+
     # Start session mapper for PTY sessions
     from task_mind.server.services.terminal_service import terminal_service
     from task_mind.server.services.session_mapper import get_session_mapper
@@ -83,6 +90,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down services...")
+    watcher.stop()
     await mapper.stop()
     await community_service.stop()
     await sync_service.stop()

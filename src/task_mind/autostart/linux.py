@@ -78,7 +78,7 @@ class LinuxAutostartManager(AutostartManager):
             [Service]
             Type=exec
             Environment=PATH={env_path}
-            ExecStart={python_path} -m task-mind.server.runner --daemon
+            ExecStart={python_path} -m task_mind.server.runner --daemon
             Restart=on-failure
             RestartSec=5
 
