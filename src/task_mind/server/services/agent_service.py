@@ -117,7 +117,7 @@ class AgentService:
             }
 
     @staticmethod
-    def continue_task(session_id: str, prompt: str) -> Dict[str, Any]:
+    async def continue_task(session_id: str, prompt: str) -> Dict[str, Any]:
         """Continue conversation in specified session.
 
         Args:
@@ -160,6 +160,25 @@ class AgentService:
                 with open(metadata_file) as f:
                     metadata = json.load(f)
                     project_path = metadata.get("project_path")
+                
+                # Update status to RUNNING so the UI reflects the change immediately
+                try:
+                    from task_mind.session.models import AgentType, SessionStatus
+                    from task_mind.session.storage import update_metadata, read_metadata
+                    
+                    # Force read to ensure we have the object
+                    current_session = read_metadata(session_id, AgentType.CLAUDE)
+                    if current_session:
+                        update_metadata(
+                            session_id, 
+                            AgentType.CLAUDE, 
+                            status=SessionStatus.RUNNING,
+                            ended_at=None,
+                            last_activity=datetime.now(timezone.utc)
+                        )
+                        logger.info(f"Reset session {session_id[:8]} status to RUNNING")
+                except Exception as e:
+                    logger.warning(f"Failed to update session status: {e}")
 
             # Build command
             cmd = [
@@ -172,16 +191,53 @@ class AgentService:
                 str(prompt_file),
             ]
 
-            # Start process in background
-            with open(log_file, "w", encoding="utf-8") as f:
-                subprocess.Popen(
-                    prepare_command_for_windows(cmd),
-                    stdout=f,
-                    stderr=subprocess.STDOUT,
-                    start_new_session=True,
-                    cwd=project_path if project_path else None,
-                    env=get_utf8_env(),
-                )
+            # Build command
+            cmd = [
+                task_mind_path,
+                "agent",
+                "--resume",
+                session_id,
+                "--yes",
+                "--prompt-file",
+                str(prompt_file),
+            ]
+
+            # Use TerminalService to start process in PTY
+            # This allows "Live PTY" to attach to it and view output
+            from task_mind.server.services.terminal_service import terminal_service
+            
+            # Use a deterministic PTY ID so we can map it easily
+            pty_session_id = f"resume-{session_id}"
+            
+            # Start PTY session
+            # Note: We don't need to redirect stdout to log_file manually because 
+            # TerminalSession captures PTY output. However, for logging persistence,
+            # we might want to tail it or rely on the agent's internal logging.
+            # task-mind agent logs to --log-file separately anyway if configured, 
+            # or we rely on the implementation above that sets up logging.
+            # actually task-mind agent usually logs to stderr/stdout
+            
+            # IMPORTANT: The original implementation redirected stdout/stderr to a log file.
+            # TerminalService captures stdout/stderr. 
+            # We can rely on TerminalSession history for the "Console" view.
+            
+            result = await terminal_service.start_pty_session(
+                command=cmd,
+                cwd=project_path if project_path else None,
+                env=get_utf8_env(),
+                session_id=pty_session_id
+            )
+            
+            if result.get("status") == "ok":
+                # Register mapping so Live PTY finds it via task ID
+                terminal_service.register_mapping(session_id, pty_session_id)
+                logger.info(f"Started resume task {session_id[:8]} in PTY {pty_session_id}")
+            else:
+                logger.error(f"Failed to start PTY for resume: {result.get('error')}")
+                return {
+                    "status": "error",
+                    "error": f"Failed to start PTY: {result.get('error')}"
+                }
 
             title = prompt[:50] + "..." if len(prompt) > 50 else prompt
 

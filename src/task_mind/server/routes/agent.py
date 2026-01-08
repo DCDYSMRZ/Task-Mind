@@ -76,7 +76,7 @@ async def continue_agent(session_id: str, request: AgentContinueRequest) -> Dict
     if not session_id or not session_id.strip():
         raise HTTPException(status_code=400, detail="session_id cannot be empty")
 
-    result = AgentService.continue_task(session_id, request.prompt)
+    result = await AgentService.continue_task(session_id, request.prompt)
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))

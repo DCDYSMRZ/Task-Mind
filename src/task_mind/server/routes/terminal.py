@@ -40,17 +40,20 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
             pass
         return
     
-    # If no session exists, check if it's a completed Claude session
+    # If no session exists, this might be a request to RESUME/CONNECT to a finished task
     if not session:
         from pathlib import Path
         import json
         
         # Check if this is a Claude session that exists but isn't running
+        # NOTE: session_id here might be the task ID
+        # Let's check if we can resume it
+        
         metadata_file = Path.home() / ".task-mind" / "sessions" / "claude" / session_id / "metadata.json"
         
         if metadata_file.exists():
-            # This is a completed session, start a resume session
-            logger.info(f"Starting resume session for completed task {session_id[:8]}")
+            # This is a completed (or existing) session, start a resume session
+            logger.info(f"Starting resume session for task {session_id[:8]}")
             
             try:
                 with open(metadata_file) as f:
@@ -68,7 +71,8 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
                 return
             
             # Start a resume session in PTY (direct claude CLI)
-            resume_session_id = f"resume-{session_id}"
+            # Use 'resume-{session_id}' as the PTY ID
+            pty_session_id = f"resume-{session_id}"
             cmd = [claude_path, "--resume", session_id]
             
             # Check if project_path exists
@@ -94,11 +98,13 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
                 'LS_COLORS': 'di=34:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43',
             })
             
+            # Track the mapping: task session_id -> pty_session_id
+            # NOTE: terminal_service.start_pty_session handles session reuse if pty_session_id exists
             result = await terminal_service.start_pty_session(
                 command=cmd,
                 cwd=project_path,
                 env=color_env,
-                session_id=resume_session_id
+                session_id=pty_session_id
             )
             
             if result.get('status') != 'ok':
@@ -107,10 +113,14 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
                 await websocket.close()
                 return
             
-            session = terminal_service.get_session(resume_session_id)
+            # Register the mapping so future calls to get_session(session_id) work
+            terminal_service.register_mapping(session_id, pty_session_id)
+            
+            session = terminal_service.get_session(pty_session_id)
         else:
-            # No session found, create a standalone shell
-            logger.info(f"No session found for {session_id[:8]}, creating standalone shell")
+            # No task session found, create a standalone shell
+            # This is for "Live PTY" on something that isn't a task? Or maybe a generic ID?
+            logger.info(f"No task found for {session_id[:8]}, creating/connecting schema shell")
             shell_session_id = f"shell-{session_id}"
             
             import os
@@ -137,6 +147,9 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
                 await websocket.close()
                 return
             
+            # Register mapping
+            terminal_service.register_mapping(session_id, shell_session_id)
+            
             session = terminal_service.get_session(shell_session_id)
         
         if not session:
@@ -146,27 +159,33 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
     
     logger.info(f"Terminal WebSocket connected for session {session.session_id[:8]}")
     
+    # Send history buffer immediately
+    history = session.get_history()
+    if history:
+        await websocket.send_bytes(history)
+    
+    # Subscribe to new output
+    output_queue = session.subscribe()
+    
     # Task for reading from PTY and sending to client
     async def read_loop():
-        while True:
-            try:
-                data = await session.read()
+        try:
+            while True:
+                data = await output_queue.get()
                 if data:
                     await websocket.send_bytes(data)
                 else:
-                    await asyncio.sleep(0.05)
-            except EOFError:
-                logger.info(f"Terminal session {session_id[:8]} ended (EOF)")
-                try:
-                    await websocket.send_bytes(b"\r\n[Session ended]\r\n")
-                    await websocket.close()
-                except:
-                    pass
-                break
-            except Exception as e:
-                logger.error(f"Error reading from terminal: {e}")
-                break
-    
+                    # EOF signal
+                    logger.info(f"Terminal session {session_id[:8]} ended (EOF signal)")
+                    try:
+                        await websocket.send_bytes(b"\r\n[Session ended]\r\n")
+                        await websocket.close()
+                    except:
+                        pass
+                    break
+        except Exception as e:
+            logger.error(f"Error in terminal read loop: {e}")
+            
     read_task = asyncio.create_task(read_loop())
     
     try:
@@ -191,6 +210,7 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
     
     finally:
         read_task.cancel()
+        session.unsubscribe(output_queue)
         try:
             await read_task
         except asyncio.CancelledError:
